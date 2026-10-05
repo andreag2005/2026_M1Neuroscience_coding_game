@@ -1,1 +1,173 @@
+function maze_game()
+  % STEP 1: Close any old game window (this fixes the blocking on the 2nd launch).
+  close all force;
+  try, graphics_toolkit('qt'); catch, end   % use qt if available, ignore if not
 
+  % STEP 2: Fixed settings. Player starts at (1,1), goal is always at (10,10).
+  g.N = 10;              % grid size (10 x 10)
+  g.start = [1 1];       % start position [row column]
+  g.goal = [10 10];      % goal position (always the same)
+  g.extra = 4;           % extra steps allowed above the shortest path
+  g.mode = 'intro';      % screens: 'intro', 'play', 'end'
+  g.won = false;
+
+  % STEP 3: Create the window and connect the keyboard to on_key.
+  fig = figure('Name', 'Maze', 'NumberTitle', 'off', 'MenuBar', 'none', ...
+               'KeyPressFcn', @on_key);
+  setappdata(fig, 'g', g);   % store the game state inside the window
+
+  % STEP 4: Show the start screen.
+  show_intro(fig);
+end
+
+function clear_fig(fig)
+  % Remove everything drawn in the window but keep the keyboard connection.
+  delete(get(fig, 'children'));
+end
+
+function show_intro(fig)
+  % STEP 5: Start screen with the rules (keyboard only).
+  clear_fig(fig);
+  axes('Parent', fig, 'Position', [0 0 1 1]); axis off;
+  text(0.5, 0.88, 'MAZE GAME', 'HorizontalAlignment', 'center', ...
+       'FontSize', 26, 'FontWeight', 'bold');
+  rules = {'RULES', ...
+           '', ...
+           'Move the red square with Z (up), Q (left), S (down), D (right).', ...
+           'You move one step at a time.', ...
+           'Black squares are walls: you cannot cross them.', ...
+           'Reach the GREEN square before you run out of steps.', ...
+           'If you reach it: WINNER!  If not: LOOSER.', ...
+           'After a game: R = start again (same maze), N = new game (after a win).', ...
+           '', ...
+           'Press SPACE to start'};
+  text(0.5, 0.45, rules, 'HorizontalAlignment', 'center', 'FontSize', 12);
+  drawnow;
+end
+
+function g = new_maze(g)
+  % STEP 6: Generate random walls. Retry until a path from start to goal exists.
+  while true
+    walls = rand(g.N) < 0.28;                 % about 28% of cells are walls
+    walls(g.start(1), g.start(2)) = 0;        % start must be free
+    walls(g.goal(1), g.goal(2)) = 0;          % goal must be free
+    d = shortest_path(walls, g.start, g.goal);
+    if d > 0                                  % d > 0 means a path exists
+      break;
+    end
+  end
+  g.walls = walls;
+  % STEP 7: Step limit = shortest path + a few extra steps, so it is always possible.
+  g.maxsteps = d + g.extra;
+end
+
+function d = shortest_path(walls, start, goal)
+  % STEP 8: Breadth-first search. Returns shortest path length, or -1 if none.
+  N = size(walls, 1);
+  dist = -ones(N);
+  dist(start(1), start(2)) = 0;
+  queue = start;
+  moves = [1 0; -1 0; 0 1; 0 -1];
+  while ~isempty(queue)
+    cur = queue(1, :);
+    queue(1, :) = [];
+    for k = 1:4
+      nxt = cur + moves(k, :);
+      if all(nxt >= 1) && all(nxt <= N) && walls(nxt(1), nxt(2)) == 0 ...
+         && dist(nxt(1), nxt(2)) == -1
+        dist(nxt(1), nxt(2)) = dist(cur(1), cur(2)) + 1;
+        queue(end+1, :) = nxt;
+      end
+    end
+  end
+  d = dist(goal(1), goal(2));
+end
+
+function g = reset_player(g)
+  % STEP 9: Put the player back at the start with 0 steps used.
+  g.player = g.start;
+  g.steps = 0;
+  g.mode = 'play';
+end
+
+function draw_game(fig, msg)
+  % STEP 10: Draw the grid. white = floor, black = wall,
+  % light blue = start, green = goal, red = player.
+  g = getappdata(fig, 'g');
+  M = ones(g.N);                         % 1 = floor
+  M(g.walls == 1) = 2;                   % 2 = wall
+  M(g.start(1), g.start(2)) = 3;         % 3 = start
+  M(g.goal(1), g.goal(2)) = 4;           % 4 = goal (different color)
+  M(g.player(1), g.player(2)) = 5;       % 5 = player
+  clear_fig(fig);
+  axes('Parent', fig);
+  image(M);
+  colormap([1 1 1; 0 0 0; 0.6 0.8 1; 0 0.8 0; 1 0.2 0.2]);
+  axis equal; axis off;
+  title(sprintf('Steps left: %d   %s', g.maxsteps - g.steps, msg), 'FontSize', 14);
+  drawnow;
+end
+
+function on_key(src, evt)
+  % STEP 11: Read the pressed key (as lowercase text).
+  g = getappdata(src, 'g');
+  key = evt.Key;
+  if isempty(key), key = evt.Character; end
+  if strcmp(key, ' '), key = 'space'; end
+  key = lower(key);
+
+  switch g.mode
+    case 'intro'
+      % STEP 12: SPACE starts the first level.
+      if strcmp(key, 'space')
+        g = new_maze(g);
+        g = reset_player(g);
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      end
+
+    case 'play'
+      % STEP 13: Z/Q/S/D move the player by exactly one cell.
+      switch key
+        case 'z', d = [-1 0];   % up
+        case 's', d = [1 0];    % down
+        case 'q', d = [0 -1];   % left
+        case 'd', d = [0 1];    % right
+        otherwise, return;
+      end
+      nxt = g.player + d;
+      % A move is valid only if it stays inside the grid and is not a wall.
+      if all(nxt >= 1) && all(nxt <= g.N) && g.walls(nxt(1), nxt(2)) == 0
+        g.player = nxt;
+        g.steps = g.steps + 1;
+      end
+
+      % STEP 14: WINNER if on the goal, LOOSER if no steps left.
+      if isequal(g.player, g.goal)
+        g.mode = 'end'; g.won = true;
+        setappdata(src, 'g', g);
+        draw_game(src, 'WINNER!  R = start again | N = new game');
+      elseif g.steps >= g.maxsteps
+        g.mode = 'end'; g.won = false;
+        setappdata(src, 'g', g);
+        draw_game(src, 'LOOSER  R = start again');
+      else
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      end
+
+    case 'end'
+      % STEP 15: R = same maze, player back to start.
+      if strcmp(key, 'r')
+        g = reset_player(g);
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      % STEP 16: N = new random walls (only after a win), same start and goal.
+      elseif strcmp(key, 'n') && g.won
+        g = new_maze(g);
+        g = reset_player(g);
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      end
+  end
+end
