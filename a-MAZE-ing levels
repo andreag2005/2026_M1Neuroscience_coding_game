@@ -11,8 +11,8 @@ function maze_game()
   g.goal = [10 10];      % goal position (always the bottom-right corner)
   g.mode = 'intro';      % screens: 'intro', 'menu', 'play', 'end', 'victory'
   g.won = false;
-  g.level = 1;           % current level (1 to 10)
-  g.maxlevel = 10;       % number of levels in the game
+  g.level = 1;           % current level (1 to 8)
+  g.maxlevel = 88;       % number of levels in the game
   g.layout = 'AZERTY';   % keyboard layout: 'AZERTY' or 'QWERTY'
   g.enemies = zeros(0, 2);   % current enemy positions [row column], one line per enemy
   g.enemies0 = zeros(0, 2);  % enemy start positions (used when we restart the same maze)
@@ -37,18 +37,18 @@ function maze_game()
 end
 
 function [N, density, extra, nEnemies, chase] = level_settings(level)
-  % STEP 6: Setting the difficulty of each level (10 levels).
+  % STEP 6: Setting the difficulty of each level (8 levels).
   % N        = grid size (bigger grid = longer way to the goal)
   % density  = share of cells that are hedge (more hedge = harder)
   % extra    = steps allowed on top of the shortest path (fewer = harder)
   %            (more generous than before, because enemies force detours)
   % nEnemies = number of enemies on the grid
   % chase    = chance that an enemy walks toward the player instead of randomly
-  Ns        = [10   10   11   11   12   12   13   13   14   15  ];
-  densities = [0.17 0.20 0.23 0.26 0.28 0.30 0.32 0.33 0.34 0.35];
-  extras    = [14   13   12   12   11   10   10   9    8    8   ];
-  enemies   = [0    1    1    2    2    3    3    4    4    5   ];
-  chases    = [0    0.2  0.3  0.3  0.4  0.4  0.5  0.5  0.6  0.7 ];
+  Ns        = [10   10   11   11   12   12   13   13 ];
+  densities = [0.17 0.20 0.23 0.26 0.28 0.30 0.32 0.33 ];
+  extras    = [14   13   12   12   11   10   10   9 ];
+  enemies   = [0    1    1    2    2    3    3    4  ];
+  chases    = [0    0.2  0.3  0.3  0.4  0.4  0.5  0.5 ];
   N = Ns(level);
   density = densities(level);
   extra = extras(level);
@@ -90,8 +90,8 @@ function show_intro(fig)
            'Avoid the PURPLE enemies: if one touches you, you lose!', ...
            'Enemies move each time you move.', ...
            'If you reach the goal: WINNER!  If not: LOOSER.', ...
-           'There are 10 levels: bigger maze, more hedges, more enemies.', ...
-           'Beat level 10 to escape the maze and win the golden trophy!', ...
+           'There are 8 levels: bigger maze, more hedges, more enemies.', ...
+           'Beat level 8 to escape the maze and win the golden trophy!', ...
            '', ...
            'R = start again (same maze)    N = new game (new random walls)', ...
            'I = next level (only after a win)', ...
@@ -105,13 +105,12 @@ function show_intro(fig)
 end
 
 function show_menu(fig)
-  % STEP 9: Level menu. Keys 1 to 9 = levels 1 to 9, key 0 = level 10.
+  % STEP 9: Level menu. Keys 1 to 8 = levels 1 to 8.
   clear_fig(fig);
   axes('Parent', fig, 'Position', [0 0 1 1]); axis off;
   text(0.5, 0.85, 'LEVEL MENU', 'HorizontalAlignment', 'center', ...
        'FontSize', 24, 'FontWeight', 'bold');
-  items = {'Press 1 to 9 to choose level 1 to 9', ...
-           'Press 0 for level 10 (the hardest)', ...
+  items = {'Press 1 to 9 to choose level 1 to 8', ...
            '', ...
            'Higher levels = bigger maze, more hedges, more enemies.', ...
            '', ...
@@ -121,7 +120,7 @@ function show_menu(fig)
 end
 
 function show_victory(fig)
-  % STEP 30: Final screen shown after beating level 10.
+  % STEP 30: Final screen shown after beating level 8.
   % Congratulations message, confetti and a golden trophy.
   clear_fig(fig);
   ax = axes('Parent', fig, 'Position', [0 0 1 1]);
@@ -171,10 +170,10 @@ function show_victory(fig)
        'FontSize', 32, 'FontWeight', 'bold', 'Color', gold);
   text(0.5, 0.84, 'You escaped the maze!', 'HorizontalAlignment', 'center', ...
        'FontSize', 20, 'Color', [1 1 1]);
-  text(0.5, 0.74, 'All 10 levels completed - you are the a-MAZE-ing champion!', ...
+  text(0.5, 0.74, 'All 8 levels completed - you are the a-MAZE-ing champion!', ...
        'HorizontalAlignment', 'center', 'FontSize', 13, ...
        'FontAngle', 'italic', 'Color', [0.8 0.9 1]);
-  text(0.5, 0.17, 'SPACE = play again from level 1    R = replay level 10', ...
+  text(0.5, 0.17, 'SPACE = play again from level 1    R = replay level 8', ...
        'HorizontalAlignment', 'center', 'FontSize', 12, 'Color', [1 1 1]);
   text(0.5, 0.11, 'M = level menu    H = start screen', ...
        'HorizontalAlignment', 'center', 'FontSize', 12, 'Color', [1 1 1]);
@@ -383,11 +382,11 @@ function on_key(src, evt)
       end
 
     case 'menu'
-      % STEP 23: Keys 1 to 9 = levels 1 to 9, key 0 = level 10.
-      if any(strcmp(key, {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'}))
+      % STEP 23: Keys 1 to 8 = levels 1 to 8
+      if any(strcmp(key, {'1', '2', '3', '4', '5', '6', '7', '8'}))
         g.level = str2double(key);
         if g.level == 0
-          g.level = 10;
+          g.level = 8;
         end
         g = new_maze(g);
         g = reset_player(g);
