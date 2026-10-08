@@ -1,3 +1,69 @@
+% ================================================================
+%                       a-MAZE-ing
+% ================================================================
+% Goal:
+% The goal of the game is to guide the player from the top-left
+% corner of the maze to the bottom-right corner while avoiding
+% hedges and enemies and respecting the maximum number of steps.
+%
+% Game components:
+% - Randomly generated mazes
+% - Player
+% - Goal
+% - Hedge obstacles
+% - Moving enemies
+% - 8 difficulty levels
+% - AZERTY / QWERTY controls
+% - Intro, menu, game, victory and end screens
+%
+% Main variables:
+% g.player      = current player position
+% g.goal        = goal position
+% g.walls       = maze obstacles
+% g.enemies     = current enemy positions
+% g.level       = current difficulty level
+% g.steps       = number of steps used
+% g.maxsteps    = maximum number of steps allowed
+%
+% Main loop:
+% The game waits for a keyboard input. When the player presses
+% a movement key, the program checks whether the movement is valid,
+% moves the player, moves the enemies and checks for win/lose
+% conditions.
+%
+% Rules:
+% - The player starts at the top-left corner.
+% - The goal is at the bottom-right corner.
+% - Hedges cannot be crossed.
+% - Each valid player movement uses one step.
+% - Enemies move after each valid movement.
+% - Touching an enemy causes a loss.
+% - Reaching the goal causes a win.
+% - Running out of steps causes a loss.
+%
+% Controls:
+% AZERTY: Z = up, Q = left, S = down, D = right
+% QWERTY: W = up, A = left, S = down, D = right
+% L = switch keyboard layout
+% M = level menu
+% H = return to start screen
+% R = replay
+%
+% Context:
+% a-MAZE-ing is a maze game based on exploration, path planning
+% and risk management. The difficulty increases over 8 levels.
+% Sources:
+% - Images: created by Andrea and Berenice and Pinterest
+% - Enemy movement: original implementation using random movement
+%   and Manhattan-distance-based chasing.
+% coding assistance: AI, Claude and Copilot GetHub for the code
+% Software:
+% GNU Octave: 11.3.0 
+%Code version: 1.0
+% Author: Andrea Garcia and Berenice Richard--Beverley
+% date: 08/10/2026
+% ================================================================
+
 function maze_game()
   %GLOBAL CONFIGURATION OF THE GAME%
   % STEP 1: Close any old game window (fixes blocking on the 2nd launch).
@@ -25,8 +91,7 @@ function maze_game()
   % so a missing image never leaves a half-created window open.
   % Names are given without extension: load_img finds .png, .jpg or .jpeg by itself.
   % All the images must be in the same folder as this file.
-  folder = fileparts(mfilename('fullpath'));
-  % The 6 start screens: start1, start2, ... start6
+  folder = fileparts(mfilename('fullpath'));  % The 6 start screens: start1, start2, ... start6
   g.startImgs = cell(1, g.nStart);
   for i = 1:g.nStart
     g.startImgs{i} = load_img(folder, sprintf('start%d', i));
@@ -539,4 +604,4 @@ function on_key(src, evt)
         draw_game(src, '');
       end
   end
-end
+endfunction
