@@ -69,12 +69,12 @@ function show_intro(fig)
            '', ...
            sprintf('Move the player with %s (up), %s (left), %s (down), %s (right).', ...
                    upper(k.up), upper(k.left), upper(k.down), upper(k.right)), ...
-           'You move one step at a time. Black squares are walls.', ...
+           'Help the person scape the maze. You move one step at a time. You can`t cross the hedges.', ...
            'Reach the RED square before you run out of steps.', ...
            'If you reach it: WINNER!  If not: LOOSER.', ...
            'There are 5 levels, from easy to very hard.', ...
            '', ...
-           'R = start again (same maze)    N = new game (new random walls)', ...
+           'R = start again (same maze)    N = new game (new random obstacles)', ...
            'I = next level (only after a win)', ...
            'M = level menu    H = back to this screen', ...
            '', ...
@@ -132,14 +132,14 @@ function draw_game(fig, msg)
     set(hPlayer, 'AlphaData', g.playerAlpha);
   end
 
-  % Axes configuration
+  %STEP 12: Axes configuration
   axis equal;
   axis([0.5 g.N+0.5 0.5 g.N+0.5]);
   set(gca, 'YDir', 'reverse');
   axis off;
   hold off;
 
-  % Display level info and remaining steps
+  %STEP 13: Display level info and remaining steps
   title({sprintf('Level %d   Steps left: %d', g.level, g.maxsteps - g.steps), msg}, ...
         'FontSize', 13);
   drawnow;
@@ -149,7 +149,7 @@ function draw_game(fig, msg)
 end
 
 function g = new_maze(g)
-  % STEP 9: Make random walls for the current level. 0 = Open grass path  1 = Hedge walls (obstacles)
+  % STEP 14: Make random walls for the current level. 0 = Open grass path  1 = Hedge walls (obstacles)
   % Retry until a path from start to goal exists, so the level is always solvable.
   [density, extra] = level_settings(g.level);
   while true
@@ -162,12 +162,12 @@ function g = new_maze(g)
     end
   end
   g.walls = walls;
-  % STEP 10: Step limit = shortest path + extra steps, so winning is always possible.
+  % STEP 15: Step limit = shortest path + extra steps, so winning is always possible.
   g.maxsteps = d + extra;
 end
 
 function d = shortest_path(walls, start, goal)
-  % STEP 11: Breadth-first search. Returns shortest path length, or -1 if none.
+  % STEP 16: Breadth-first search. Returns shortest path length, or -1 if none.
   N = size(walls, 1);
   dist = -ones(N);
   dist(start(1), start(2)) = 0;
@@ -189,7 +189,7 @@ function d = shortest_path(walls, start, goal)
 end
 
 function g = reset_player(g)
-  % STEP 12: Put the player back at the start with 0 steps used.
+  % STEP 17: Put the player back at the start with 0 steps used.
   g.player = g.start;
   g.steps = 0;
   g.mode = 'play';
@@ -198,7 +198,7 @@ end
 
 %KEYBOARD HANDLE%
 function on_key(src, evt)
-  % STEP 14: Read the pressed key (as lowercase text).
+  % STEP 18: Read the pressed key (as lowercase text).
   g = getappdata(src, 'g');
   key = evt.Key;
   if isempty(key), key = evt.Character; end
@@ -207,7 +207,7 @@ function on_key(src, evt)
   key = lower(key);
   k = get_keys(g.layout);
 
-  % STEP 15: H goes back to the start screen, M opens the level menu.
+  % STEP 19: H goes back to the start screen, M opens the level menu.
   if strcmp(key, 'h') && ~strcmp(g.mode, 'intro')
     g.mode = 'intro';
     setappdata(src, 'g', g);
@@ -240,7 +240,7 @@ function on_key(src, evt)
       end
 
     case 'menu'
-      % STEP 17: Keys 1 to 5 start the chosen level with a new random maze.
+      % STEP 20: Keys 1 to 5 start the chosen level with a new random maze.
       if any(strcmp(key, {'1', '2', '3', '4', '5'}))
         g.level = str2double(key);
         g = new_maze(g);
@@ -250,7 +250,7 @@ function on_key(src, evt)
       end
 
     case 'play'
-      % STEP 18: Movement keys move the player by exactly one cell.
+      % STEP 21: Movement keys move the player by exactly one cell.
       if strcmp(key, k.up),        d = [-1 0];
       elseif strcmp(key, k.down),  d = [1 0];
       elseif strcmp(key, k.left),  d = [0 -1];
@@ -264,7 +264,7 @@ function on_key(src, evt)
         g.steps = g.steps + 1;
       end
 
-      % STEP 19: WINNER if player arrives to the goal, LOOSER if there are no steps left.
+      % STEP 22: WINNER if player arrives to the goal, LOOSER if there are no steps left.
       if isequal(g.player, g.goal)
         g.mode = 'end'; g.won = true;
         setappdata(src, 'g', g);
@@ -284,18 +284,18 @@ function on_key(src, evt)
 
     case 'end'
       if strcmp(key, 'r')
-        % STEP 20: R = same maze, player back to start.
+        % STEP 23: R = same maze, player back to start.
         g = reset_player(g);
         setappdata(src, 'g', g);
         draw_game(src, '');
       elseif strcmp(key, 'n') && g.won
-        % STEP 21: N = new random walls, same level, same start and goal.
+        % STEP 24: N = new random walls, same level, same start and goal.
         g = new_maze(g);
         g = reset_player(g);
         setappdata(src, 'g', g);
         draw_game(src, '');
       elseif strcmp(key, 'i') && g.won && g.level < 5
-        % STEP 22: I = go to the next level (only after a win).
+        % STEP 25: I = go to the next level (only after a win).
         g.level = g.level + 1;
         g = new_maze(g);
         g = reset_player(g);
