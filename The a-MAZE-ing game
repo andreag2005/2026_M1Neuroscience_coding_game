@@ -77,6 +77,7 @@ function maze_game()
   g.goal = [10 10];      % goal position (always the bottom-right corner)
   g.mode = 'intro';      % screens: 'intro', 'menu', 'play', 'end', 'victory'
   g.won = false;
+  g.player = g.start
   g.level = 1;           % current level (1 to 8)
   g.maxlevel = 8;        % number of levels in the game
   g.layout = 'AZERTY';   % keyboard layout: 'AZERTY' or 'QWERTY'
