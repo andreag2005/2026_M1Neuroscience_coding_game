@@ -5,50 +5,79 @@ function maze_game()
   try, graphics_toolkit('qt'); catch, end
 
   % STEP 2: Defining the game parameters. Start is always (1,1).
-  % The grid size and the goal now depend on the level (see level_settings and new_maze).
+  % The grid size and the goal depend on the level (see level_settings and new_maze).
   g.N = 10;              % grid size (changes with the level)
   g.start = [1 1];       % start position [row column]
   g.goal = [10 10];      % goal position (always the bottom-right corner)
-  g.mode = 'intro';      % screens: 'intro', 'menu', 'play', 'end'
+  g.mode = 'intro';      % screens: 'intro', 'menu', 'play', 'end', 'victory'
   g.won = false;
-  g.level = 1;           % current level (1 to 10)
-  g.maxlevel = 10;       % number of levels in the game
+  g.level = 1;           % current level (1 to 8)
+  g.maxlevel = 8;        % number of levels in the game
   g.layout = 'AZERTY';   % keyboard layout: 'AZERTY' or 'QWERTY'
   g.enemies = zeros(0, 2);   % current enemy positions [row column], one line per enemy
   g.enemies0 = zeros(0, 2);  % enemy start positions (used when we restart the same maze)
   g.chase = 0;               % chance (0 to 1) that an enemy moves toward the player
+  g.nStart = 6;          % number of start screens (start1 to start6)
+  g.introIdx = 1;        % which start screen is shown now (changes with SPACE)
+  g.lastmsg = '';        % last message shown in the title (used when we redraw)
 
-  % STEP 3: Creation of the window and connecting the keyboard to on_key.
+  % STEP 3: Loading the images BEFORE creating the window,
+  % so a missing image never leaves a half-created window open.
+  % Names are given without extension: load_img finds .png, .jpg or .jpeg by itself.
+  % All the images must be in the same folder as this file.
+  folder = fileparts(mfilename('fullpath'));
+  % The 6 start screens: start1, start2, ... start6
+  g.startImgs = cell(1, g.nStart);
+  for i = 1:g.nStart
+    g.startImgs{i} = load_img(folder, sprintf('start%d', i));
+  end
+  % Player that moves from start to goal
+  [g.playerImg, g.playerAlpha] = load_img(folder, 'player');
+  % Grass background
+  g.grassImg = load_img(folder, 'grass_background');
+  % Hedge walls that function as the blocking obstacles
+  [g.hedgeImg, g.hedgeAlpha] = load_img(folder, 'hedge');
+  % Enemies (if one touches the player, the player loses)
+  [g.enemyImg, g.enemyAlpha] = load_img(folder, 'enemy');
+  % The goal cell (the end of the maze)
+  [g.endImg, g.endAlpha] = load_img(folder, 'end');
+
+  % STEP 4: Creation of the window and connecting the keyboard to on_key.
   fig = figure('Name', 'a-MAZE-ing', 'NumberTitle', 'off', 'MenuBar', 'none', ...
                'KeyPressFcn', @on_key);
-
-  % STEP 4: Loading the images.
-  folder = fileparts(mfilename('fullpath'));
-  % Player that moves from start to goal
-  [g.playerImg, ~, g.playerAlpha] = imread(fullfile(folder, 'player.png'));
-  % Grass background
-  g.grassImg = imread(fullfile(folder, 'grass_background.png'));
-  % Hedge walls that function as the blocking obstacles
-  [g.hedgeImg, ~, g.hedgeAlpha] = imread(fullfile(folder, 'hedge.png'));
   setappdata(fig, 'g', g);
 
-  % STEP 5: Show the start screen.
+  % STEP 5: Show the first start screen.
   show_intro(fig);
 end
 
+function [img, alpha] = load_img(folder, name)
+  % STEP 6: Read an image file given WITHOUT extension (for example 'start1').
+  % It tries .png, then .jpg, then .jpeg. If none exists, it shows a clear message.
+  % alpha = transparency of the PNG (empty for a jpeg, which has no transparency).
+  extensions = {'.png', '.jpg', '.jpeg'};
+  for e = 1:length(extensions)
+    file = fullfile(folder, [name extensions{e}]);
+    if exist(file, 'file')
+      [img, ~, alpha] = imread(file);
+      return;
+    end
+  end
+  error('Image not found: %s (.png, .jpg or .jpeg) in the folder %s', name, folder);
+end
+
 function [N, density, extra, nEnemies, chase] = level_settings(level)
-  % STEP 6: Setting the difficulty of each level (10 levels).
+  % STEP 7: Setting the difficulty of each level (8 levels).
   % N        = grid size (bigger grid = longer way to the goal)
   % density  = share of cells that are hedge (more hedge = harder)
   % extra    = steps allowed on top of the shortest path (fewer = harder)
-  %            (more generous than before, because enemies force detours)
   % nEnemies = number of enemies on the grid
   % chase    = chance that an enemy walks toward the player instead of randomly
-  Ns        = [10   10   11   11   12   12   13   13   14   15  ];
-  densities = [0.17 0.20 0.23 0.26 0.28 0.30 0.32 0.33 0.34 0.35];
-  extras    = [14   13   12   12   11   10   10   9    8    8   ];
-  enemies   = [0    1    1    2    2    3    3    4    4    5   ];
-  chases    = [0    0.2  0.3  0.3  0.4  0.4  0.5  0.5  0.6  0.7 ];
+  Ns        = [10   10   11   11   12   12   13   13  ];
+  densities = [0.17 0.20 0.23 0.26 0.28 0.30 0.32 0.33];
+  extras    = [14   13   12   12   11   10   10   9   ];
+  enemies   = [0    1    1    2    2    3    3    4   ];
+  chases    = [0    0.2  0.3  0.3  0.4  0.4  0.5  0.5 ];
   N = Ns(level);
   density = densities(level);
   extra = extras(level);
@@ -57,7 +86,7 @@ function [N, density, extra, nEnemies, chase] = level_settings(level)
 end
 
 function k = get_keys(layout)
-  % STEP 7: Defining the control movement keys depending on the keyboard layout.
+  % STEP 8: Defining the control movement keys depending on the keyboard layout.
   if strcmp(layout, 'AZERTY')
     k.up = 'z'; k.left = 'q'; k.down = 's'; k.right = 'd';
   else
@@ -65,52 +94,41 @@ function k = get_keys(layout)
   end
 end
 
-%SETUP OF THE INTRODUCTION SCREEN%
+function g = switch_layout(g)
+  % STEP 9: Switch between AZERTY and QWERTY.
+  if strcmp(g.layout, 'AZERTY')
+    g.layout = 'QWERTY';
+  else
+    g.layout = 'AZERTY';
+  end
+end
+
+%SETUP OF THE SCREENS%
 function clear_fig(fig)
   % Remove everything drawn in the window but keep the keyboard connection.
   delete(get(fig, 'children'));
 end
 
 function show_intro(fig)
-  % STEP 8: Start screen with title, credits and rules.
+  % STEP 10: Start screen = one of the images start1 ... start6.
+  % The image number is g.introIdx. SPACE goes to the next one (see on_key).
   g = getappdata(fig, 'g');
-  k = get_keys(g.layout);
   clear_fig(fig);
-  axes('Parent', fig, 'Position', [0 0 1 1]); axis off;
-  text(0.5, 0.94, 'a-MAZE-ing', 'HorizontalAlignment', 'center', ...
-       'FontSize', 28, 'FontWeight', 'bold');
-  text(0.5, 0.87, 'Created by Andrea and Berenice', 'HorizontalAlignment', 'center', ...
-       'FontSize', 12, 'FontAngle', 'italic');
-  rules = {'RULES', ...
-           '', ...
-           sprintf('Move the player with %s (up), %s (left), %s (down), %s (right).', ...
-                   upper(k.up), upper(k.left), upper(k.down), upper(k.right)), ...
-           'You move one step at a time. Hedges are walls.', ...
-           'Reach the RED square before you run out of steps.', ...
-           'Avoid the PURPLE enemies: if one touches you, you lose!', ...
-           'Enemies move each time you move.', ...
-           'If you reach the goal: WINNER!  If not: LOOSER.', ...
-           'There are 10 levels: bigger maze, more hedges, more enemies.', ...
-           '', ...
-           'R = start again (same maze)    N = new game (new random walls)', ...
-           'I = next level (only after a win)', ...
-           'M = level menu    H = back to this screen', ...
-           '', ...
-           sprintf('Keyboard: %s   (press L to switch AZERTY / QWERTY)', g.layout), ...
-           '', ...
-           'Press SPACE to start'};
-  text(0.5, 0.44, rules, 'HorizontalAlignment', 'center', 'FontSize', 12);
+  ax = axes('Parent', fig, 'Position', [0 0 1 1]);
+  image(g.startImgs{g.introIdx}, 'Parent', ax);
+  axis(ax, 'image');        % keep the real proportions of the picture
+  axis(ax, 'off');
   drawnow;
 end
 
 function show_menu(fig)
-  % STEP 9: Level menu. Keys 1 to 9 = levels 1 to 9, key 0 = level 10.
+  % STEP 11: Level menu. Keys 1 to 8 choose the level.
   clear_fig(fig);
   axes('Parent', fig, 'Position', [0 0 1 1]); axis off;
   text(0.5, 0.85, 'LEVEL MENU', 'HorizontalAlignment', 'center', ...
        'FontSize', 24, 'FontWeight', 'bold');
-  items = {'Press 1 to 9 to choose level 1 to 9', ...
-           'Press 0 for level 10 (the hardest)', ...
+  items = {'Press 1 to 8 to choose a level', ...
+           'Level 8 is the hardest', ...
            '', ...
            'Higher levels = bigger maze, more hedges, more enemies.', ...
            '', ...
@@ -119,12 +137,81 @@ function show_menu(fig)
   drawnow;
 end
 
-%MAZE DESIGN%
-function draw_game(fig, msg)
-  % STEP 10: Draw the grass, the hedges, start/goal, enemies and the player.
+function show_victory(fig)
+  % STEP 12: Final screen shown after beating the last level.
+  % Congratulations message, confetti and a golden trophy.
   g = getappdata(fig, 'g');
   clear_fig(fig);
-  axes('Parent', fig);
+  ax = axes('Parent', fig, 'Position', [0 0 1 1]);
+  hold(ax, 'on');
+  set(ax, 'Color', [0.08 0.10 0.25]);          % dark night-blue background
+  xlim(ax, [0 1]); ylim(ax, [0 1]);
+  axis off;
+
+  gold = [1 0.84 0];
+  darkgold = [0.75 0.55 0];
+
+  % Confetti: random colored dots spread over the whole screen
+  nConf = 90;
+  scatter(rand(1, nConf), rand(1, nConf), 45, rand(nConf, 3), 'filled');
+
+  % Trophy handles (drawn first so the cup covers their inner side)
+  rectangle('Position', [0.30 0.50 0.11 0.10], 'Curvature', [1 1], ...
+            'EdgeColor', darkgold, 'LineWidth', 7, 'FaceColor', 'none');
+  rectangle('Position', [0.59 0.50 0.11 0.10], 'Curvature', [1 1], ...
+            'EdgeColor', darkgold, 'LineWidth', 7, 'FaceColor', 'none');
+
+  % Trophy cup: half ellipse with a flat top
+  t = linspace(pi, 2*pi, 50);
+  cupX = 0.5 + 0.14 * cos(t);
+  cupY = 0.64 + 0.22 * sin(t);
+  patch(cupX, cupY, gold, 'EdgeColor', darkgold, 'LineWidth', 2);
+
+  % Shine on the cup and a star in the middle
+  plot([0.40 0.41 0.44], [0.60 0.55 0.50], 'Color', [1 1 0.8], 'LineWidth', 4);
+  plot(0.5, 0.56, 'p', 'MarkerSize', 26, 'MarkerFaceColor', [1 1 1], ...
+       'MarkerEdgeColor', darkgold);
+
+  % Trophy stem and base
+  rectangle('Position', [0.47 0.35 0.06 0.09], 'FaceColor', gold, ...
+            'EdgeColor', darkgold, 'LineWidth', 2);
+  rectangle('Position', [0.40 0.30 0.20 0.05], 'FaceColor', gold, ...
+            'EdgeColor', darkgold, 'LineWidth', 2);
+  rectangle('Position', [0.35 0.26 0.30 0.04], 'FaceColor', darkgold, ...
+            'EdgeColor', darkgold, 'LineWidth', 2);
+
+  % Stars around the trophy
+  plot([0.18 0.82 0.12 0.88], [0.62 0.62 0.40 0.40], 'p', 'MarkerSize', 20, ...
+       'MarkerFaceColor', gold, 'MarkerEdgeColor', darkgold);
+
+  % Messages
+  text(0.5, 0.93, 'CONGRATULATIONS!', 'HorizontalAlignment', 'center', ...
+       'FontSize', 32, 'FontWeight', 'bold', 'Color', gold);
+  text(0.5, 0.84, 'You escaped the maze!', 'HorizontalAlignment', 'center', ...
+       'FontSize', 20, 'Color', [1 1 1]);
+  text(0.5, 0.74, sprintf('All %d levels completed - you are the a-MAZE-ing champion!', ...
+       g.maxlevel), 'HorizontalAlignment', 'center', 'FontSize', 13, ...
+       'FontAngle', 'italic', 'Color', [0.8 0.9 1]);
+  text(0.5, 0.17, sprintf('SPACE = play again from level 1    R = replay level %d', ...
+       g.maxlevel), 'HorizontalAlignment', 'center', 'FontSize', 12, 'Color', [1 1 1]);
+  text(0.5, 0.11, 'M = level menu    H = start screen', ...
+       'HorizontalAlignment', 'center', 'FontSize', 12, 'Color', [1 1 1]);
+  text(0.5, 0.04, 'Created by Andrea and Berenice', 'HorizontalAlignment', 'center', ...
+       'FontSize', 10, 'FontAngle', 'italic', 'Color', [0.7 0.7 0.8]);
+  hold(ax, 'off');
+  drawnow;
+end
+
+%MAZE DESIGN%
+function draw_game(fig, msg)
+  % STEP 13: Draw the grass, hedges, start/goal, enemies, player and the help text.
+  g = getappdata(fig, 'g');
+  g.lastmsg = msg;                  % remember the message (used when L redraws the screen)
+  setappdata(fig, 'g', g);
+  k = get_keys(g.layout);
+  clear_fig(fig);
+  % The game area leaves some free space at the bottom for the help text
+  ax = axes('Parent', fig, 'Position', [0.1 0.17 0.8 0.73]);
   hold on;
   % The grass background that fills the whole grid
   image([0.5 g.N + 0.5], [0.5 g.N + 0.5], g.grassImg);
@@ -133,27 +220,31 @@ function draw_game(fig, msg)
     for c = 1:g.N
       if g.walls(r, c) == 1
         hHedge = image([c-0.5 c+0.5], [r-0.5 r+0.5], g.hedgeImg);
-        if isfield(g, 'hedgeAlpha') && ~isempty(g.hedgeAlpha)
+        if ~isempty(g.hedgeAlpha)
           set(hHedge, 'AlphaData', g.hedgeAlpha); % PNG transparency
         end
       end
     end
   end
 
-  % STEP 11: Markers for the start (light blue) and goal (red) cells.
+  % STEP 14: Start cell = light blue square, goal cell = the image end.
   patch(g.start(2)+[-0.5 0.5 0.5 -0.5], g.start(1)+[-0.5 -0.5 0.5 0.5], ...
         [0.4 0.7 1], 'FaceAlpha', 0.4, 'EdgeColor', 'none');
-  patch(g.goal(2)+[-0.5 0.5 0.5 -0.5], g.goal(1)+[-0.5 -0.5 0.5 0.5], ...
-        [1 0 0], 'FaceAlpha', 0.5, 'EdgeColor', 'none');
-
-  % STEP 12: The enemies = purple circles (one per line of g.enemies).
-  for e = 1:size(g.enemies, 1)
-    er = g.enemies(e, 1); ec = g.enemies(e, 2);
-    rectangle('Position', [ec-0.35, er-0.35, 0.7, 0.7], 'Curvature', [1 1], ...
-              'FaceColor', [0.5 0 0.6], 'EdgeColor', 'k', 'LineWidth', 1.5);
+  hEnd = image([g.goal(2)-0.5 g.goal(2)+0.5], [g.goal(1)-0.5 g.goal(1)+0.5], g.endImg);
+  if ~isempty(g.endAlpha)
+    set(hEnd, 'AlphaData', g.endAlpha);
   end
 
-  % STEP 13: The player
+  % STEP 15: The enemies = the image enemy (one per line of g.enemies).
+  for e = 1:size(g.enemies, 1)
+    er = g.enemies(e, 1); ec = g.enemies(e, 2);
+    hEnemy = image([ec-0.4 ec+0.4], [er-0.4 er+0.4], g.enemyImg);
+    if ~isempty(g.enemyAlpha)
+      set(hEnemy, 'AlphaData', g.enemyAlpha);
+    end
+  end
+
+  % STEP 16: The player
   r = g.player(1); c = g.player(2);
   hPlayer = image([c-0.45 c+0.45], [r-0.45 r+0.45], g.playerImg);
   if ~isempty(g.playerAlpha)
@@ -161,20 +252,28 @@ function draw_game(fig, msg)
   end
 
   % Axes configuration
-  axis equal;
-  axis([0.5 g.N+0.5 0.5 g.N+0.5]);
-  set(gca, 'YDir', 'reverse');
-  axis off;
+  axis(ax, 'equal');
+  axis(ax, [0.5 g.N+0.5 0.5 g.N+0.5]);
+  set(ax, 'YDir', 'reverse');
+  axis(ax, 'off');
   hold off;
 
   % Display level info, remaining steps and number of enemies
-  title({sprintf('Level %d   Steps left: %d   Enemies: %d', g.level, ...
-                 g.maxsteps - g.steps, size(g.enemies, 1)), msg}, 'FontSize', 13);
+  title(ax, {sprintf('Level %d   Steps left: %d   Enemies: %d', g.level, ...
+                     g.maxsteps - g.steps, size(g.enemies, 1)), msg}, 'FontSize', 13);
+
+  % STEP 17: Help text under the game (keyboard style, how to change it, menu, start screen).
+  % Units 'normalized' = position relative to the game area (y < 0 means below it).
+  help = {sprintf('Keyboard: %s (%s = up, %s = left, %s = down, %s = right)   -   L = switch AZERTY / QWERTY', ...
+                  g.layout, upper(k.up), upper(k.left), upper(k.down), upper(k.right)), ...
+          'M = level menu   |   H = back to the start screen'};
+  text(0.5, -0.03, help, 'Parent', ax, 'Units', 'normalized', ...
+       'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', 'FontSize', 10);
   drawnow;
 end
 
 function g = new_maze(g)
-  % STEP 14: Make the maze of the current level.
+  % STEP 18: Make the maze of the current level.
   % 0 = open grass, 1 = hedge (obstacle). Retry until a path exists (always solvable).
   [N, density, extra, nEnemies, chase] = level_settings(g.level);
   g.N = N;                 % grid size of this level
@@ -193,7 +292,7 @@ function g = new_maze(g)
   % Step limit = shortest path + extra steps, so winning is always possible without enemies.
   g.maxsteps = d + extra;
 
-  % STEP 15: Place the enemies on random open cells.
+  % STEP 19: Place the enemies on random open cells.
   % They must be at least 5 cells away from the start (Manhattan distance),
   % so the player never loses at the very first move, and not on the goal.
   if nEnemies > 0
@@ -210,7 +309,7 @@ function g = new_maze(g)
 end
 
 function d = shortest_path(walls, start, goal)
-  % STEP 16: Breadth-first search. Returns shortest path length, or -1 if none.
+  % STEP 20: Breadth-first search. Returns shortest path length, or -1 if none.
   N = size(walls, 1);
   dist = -ones(N);
   dist(start(1), start(2)) = 0;
@@ -232,7 +331,7 @@ function d = shortest_path(walls, start, goal)
 end
 
 function g = move_enemies(g)
-  % STEP 17: Each enemy makes one step. Called after every valid move of the player.
+  % STEP 21: Each enemy makes one step. Called after every valid move of the player.
   % An enemy cannot go through hedges, leave the grid or step on the goal.
   % With probability g.chase it walks toward the player, otherwise it walks randomly.
   moves = [1 0; -1 0; 0 1; 0 -1];
@@ -261,12 +360,12 @@ function g = move_enemies(g)
 end
 
 function hit = enemy_touch(g)
-  % STEP 18: true if at least one enemy is on the same cell as the player.
+  % STEP 22: true if at least one enemy is on the same cell as the player.
   hit = any(g.enemies(:, 1) == g.player(1) & g.enemies(:, 2) == g.player(2));
 end
 
 function g = reset_player(g)
-  % STEP 19: Put the player and the enemies back at the start with 0 steps used.
+  % STEP 23: Put the player and the enemies back at the start with 0 steps used.
   g.player = g.start;
   g.enemies = g.enemies0;
   g.steps = 0;
@@ -275,8 +374,9 @@ end
 
 %KEYBOARD HANDLE%
 function on_key(src, evt)
-  % STEP 20: Read the pressed key (as lowercase text).
+  % STEP 24: Read the pressed key (as lowercase text).
   g = getappdata(src, 'g');
+  if isempty(g) || ~isstruct(g), return; end   % window without game data: do nothing
   key = evt.Key;
   if isempty(key), key = evt.Character; end
   if isempty(key), return; end
@@ -285,9 +385,10 @@ function on_key(src, evt)
   key = lower(key);
   k = get_keys(g.layout);
 
-  % STEP 21: H goes back to the start screen, M opens the level menu.
+  % STEP 25: H goes back to the first start screen, M opens the level menu.
   if strcmp(key, 'h') && ~strcmp(g.mode, 'intro')
     g.mode = 'intro';
+    g.introIdx = 1;
     setappdata(src, 'g', g);
     show_intro(src);
     return;
@@ -298,32 +399,36 @@ function on_key(src, evt)
     return;
   end
 
+  % STEP 26: L switches AZERTY / QWERTY while playing (the help text under the game updates).
+  if strcmp(key, 'l') && any(strcmp(g.mode, {'play', 'end'}))
+    g = switch_layout(g);
+    setappdata(src, 'g', g);
+    draw_game(src, g.lastmsg);
+    return;
+  end
+
   switch g.mode
     case 'intro'
-      % STEP 22: L switches keyboard layout, SPACE starts level 1.
-      if strcmp(key, 'l')
-        if strcmp(g.layout, 'AZERTY')
-          g.layout = 'QWERTY';
+      % STEP 27: SPACE shows the next start image (start1 -> start2 -> ... -> start6).
+      % After the last one, SPACE starts level 1.
+      if strcmp(key, 'space')
+        if g.introIdx < g.nStart
+          g.introIdx = g.introIdx + 1;
+          setappdata(src, 'g', g);
+          show_intro(src);
         else
-          g.layout = 'AZERTY';
+          g.level = 1;
+          g = new_maze(g);
+          g = reset_player(g);
+          setappdata(src, 'g', g);
+          draw_game(src, '');
         end
-        setappdata(src, 'g', g);
-        show_intro(src);
-      elseif strcmp(key, 'space')
-        g.level = 1;
-        g = new_maze(g);
-        g = reset_player(g);
-        setappdata(src, 'g', g);
-        draw_game(src, '');
       end
 
     case 'menu'
-      % STEP 23: Keys 1 to 9 = levels 1 to 9, key 0 = level 10.
-      if any(strcmp(key, {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'}))
+      % STEP 28: Keys 1 to 8 start the chosen level with a new random maze.
+      if any(strcmp(key, {'1', '2', '3', '4', '5', '6', '7', '8'}))
         g.level = str2double(key);
-        if g.level == 0
-          g.level = 10;
-        end
         g = new_maze(g);
         g = reset_player(g);
         setappdata(src, 'g', g);
@@ -331,7 +436,7 @@ function on_key(src, evt)
       end
 
     case 'play'
-      % STEP 24: Movement keys move the player by exactly one cell.
+      % STEP 29: Movement keys move the player by exactly one cell.
       if strcmp(key, k.up),        d = [-1 0];
       elseif strcmp(key, k.down),  d = [1 0];
       elseif strcmp(key, k.left),  d = [0 -1];
@@ -347,7 +452,7 @@ function on_key(src, evt)
         moved = true;
       end
 
-      % STEP 25: Find out what happened. Order of the checks:
+      % STEP 30: Find out what happened. Order of the checks:
       % 1) player on the goal = win, 2) player walked into an enemy = lose,
       % 3) enemies move, then enemy on the player = lose, 4) no steps left = lose.
       outcome = 'continue';
@@ -366,15 +471,19 @@ function on_key(src, evt)
         end
       end
 
-      % STEP 26: React to the result.
+      % STEP 31: React to the result.
       switch outcome
         case 'win'
-          g.mode = 'end'; g.won = true;
-          setappdata(src, 'g', g);
+          g.won = true;
           if g.level < g.maxlevel
+            g.mode = 'end';
+            setappdata(src, 'g', g);
             draw_game(src, 'WINNER!  R = again | N = new game | I = next level');
           else
-            draw_game(src, 'WINNER! All levels done!  R = again | N = new game');
+            % Last level beaten: show the final congratulations screen with the trophy.
+            g.mode = 'victory';
+            setappdata(src, 'g', g);
+            show_victory(src);
           end
         case 'caught'
           g.mode = 'end'; g.won = false;
@@ -391,19 +500,39 @@ function on_key(src, evt)
 
     case 'end'
       if strcmp(key, 'r')
-        % STEP 27: R = same maze, player and enemies back to their start.
+        % STEP 32: R = same maze, player and enemies back to their start.
         g = reset_player(g);
         setappdata(src, 'g', g);
         draw_game(src, '');
       elseif strcmp(key, 'n') && g.won
-        % STEP 28: N = new random walls, same level, same start and goal.
+        % STEP 33: N = new random walls, same level, same start and goal.
         g = new_maze(g);
         g = reset_player(g);
         setappdata(src, 'g', g);
         draw_game(src, '');
       elseif strcmp(key, 'i') && g.won && g.level < g.maxlevel
-        % STEP 29: I = go to the next level (only after a win).
+        % STEP 34: I = go to the next level (only after a win).
         g.level = g.level + 1;
+        g = new_maze(g);
+        g = reset_player(g);
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      end
+
+    case 'victory'
+      % STEP 35: Controls of the final screen.
+      % SPACE = new game from level 1, R = replay the last level (new random walls).
+      % (H and M are already handled above for every screen.)
+      if strcmp(key, 'space')
+        g.level = 1;
+        g.won = false;
+        g = new_maze(g);
+        g = reset_player(g);
+        setappdata(src, 'g', g);
+        draw_game(src, '');
+      elseif strcmp(key, 'r')
+        g.level = g.maxlevel;
+        g.won = false;
         g = new_maze(g);
         g = reset_player(g);
         setappdata(src, 'g', g);
