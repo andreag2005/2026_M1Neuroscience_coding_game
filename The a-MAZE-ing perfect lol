@@ -70,7 +70,7 @@ function maze_game()
   close all force;
   try, graphics_toolkit('qt'); catch, end
 
-  % STEP 2: Defining the game parameters. Start is always (1,1).
+  % STEP 2: Defining the game parameters. Start is always (1,1)
   % The grid size and the goal depend on the level (see level_settings and new_maze).
   g.N = 10;              % grid size (changes with the level)
   g.start = [1 1];       % start position [row column]
@@ -87,11 +87,9 @@ function maze_game()
   g.introIdx = 1;        % which start screen is shown now (changes with SPACE)
   g.lastmsg = '';        % last message shown in the title (used when we redraw)
 
-  % STEP 3: Loading the images BEFORE creating the window,
-  % so a missing image never leaves a half-created window open.
-  % Names are given without extension: load_img finds .png, .jpg or .jpeg by itself.
-  % All the images must be in the same folder as this file.
-  folder = fileparts(mfilename('fullpath'));  % The 6 start screens: start1, start2, ... start6
+  % STEP 3: Loading the images
+  folder = fileparts(mfilename('fullpath'));  
+  % The 6 start screens: start1, start2, ... start6
   g.startImgs = cell(1, g.nStart);
   for i = 1:g.nStart
     g.startImgs{i} = load_img(folder, sprintf('start%d', i));
@@ -187,7 +185,7 @@ function show_intro(fig)
 end
 
 function show_menu(fig)
-  % STEP 11: Level menu. Keys 1 to 8 choose the level.
+  % STEP 11: Level menu. Use keys 1 to 8 choose the level.
   clear_fig(fig);
   axes('Parent', fig, 'Position', [0 0 1 1]); axis off;
   text(0.5, 0.85, 'LEVEL MENU', 'HorizontalAlignment', 'center', ...
@@ -373,6 +371,7 @@ function g = new_maze(g)
   g.enemies = g.enemies0;
 end
 
+%GAME FUNCTIONALITY%
 function d = shortest_path(walls, start, goal)
   % STEP 20: Breadth-first search. Returns shortest path length, or -1 if none.
   N = size(walls, 1);
@@ -449,7 +448,6 @@ function on_key(src, evt)
   if length(key) > 1 && strncmp(key, 'numpad', 6), key = key(end); end  % keypad numbers
   key = lower(key);
   k = get_keys(g.layout);
-
   % STEP 25: H goes back to the first start screen, M opens the level menu.
   if strcmp(key, 'h') && ~strcmp(g.mode, 'intro')
     g.mode = 'intro';
